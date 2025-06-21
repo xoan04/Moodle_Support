@@ -12,16 +12,27 @@ import {
   Bell,
   HelpCircle,
   Building2,
-  Users2
+  Users2,
+  BookOpen
 } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import TokenManager from '@/utils/cookies_standart'
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
 
   const isActive = (path: string) => {
     return pathname === path
+  }
+
+  const handleLogout = () => {
+    // Clear all authentication data
+    TokenManager.clearAuth()
+    
+    // Redirect to home page
+    router.push('/')
   }
 
   return (
@@ -37,8 +48,8 @@ export default function Sidebar() {
             <User className="h-6 w-6 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">Juan Pérez</p>
-            <p className="text-xs text-white/70 truncate">juan.perez@ejemplo.com</p>
+            <p className="text-sm font-medium text-white truncate">Super Admin</p>
+            <p className="text-xs text-white/70 truncate">admin@ejemplo.com</p>
           </div>
           <ChevronDown className="h-4 w-4 text-white/70" />
         </div>
@@ -66,6 +77,18 @@ export default function Sidebar() {
         >
           <Users className="h-5 w-5" />
           <span>Usuarios</span>
+        </Link>
+
+        <Link 
+          href="/course" 
+          className={`flex items-center space-x-3 p-3 rounded-lg ${
+            isActive('/course') 
+              ? 'bg-pistachio/20 text-white' 
+              : 'text-white/70 hover:bg-pistachio/20 hover:text-white'
+          } transition-colors`}
+        >
+          <BookOpen className="h-5 w-5" />
+          <span>Cursos</span>
         </Link>
         
         {/* PQRS Section */}
@@ -113,7 +136,10 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-white/10">
-        <button className="flex items-center space-x-3 p-3 rounded-lg text-white/70 hover:bg-pistachio/20 hover:text-white transition-colors w-full">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center space-x-3 p-3 rounded-lg text-white/70 hover:bg-pistachio/20 hover:text-white transition-colors w-full"
+        >
           <LogOut className="h-5 w-5" />
           <span>Cerrar Sesión</span>
         </button>

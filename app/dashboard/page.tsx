@@ -1,8 +1,8 @@
 "use client"
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { 
   Users, 
   BookOpen, 
@@ -12,73 +12,185 @@ import {
   FileText, 
   TrendingUp,
   Bell,
-  HelpCircle
+  HelpCircle,
+  Activity,
+  Eye,
+  EyeOff,
+  Calendar,
+  Target,
+  BarChart3,
+  ExternalLink
 } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
+import { useMoodleStatisticsController } from '@/features/statics/controller'
+import { useRouter } from 'next/navigation'
 
-// Mock data - Replace with real data from your backend
-const topCourses = [
-  { 
-    name: 'Matemáticas Avanzadas',
-    students: 120,
-    growth: 15,
-    completion: 85,
-    category: 'Ciencias Exactas'
-  },
-  { 
-    name: 'Física Cuántica',
-    students: 98,
-    growth: 12,
-    completion: 82,
-    category: 'Ciencias Exactas'
-  },
-  { 
-    name: 'Programación Web',
-    students: 85,
-    growth: 25,
-    completion: 78,
-    category: 'Tecnología'
-  },
-  { 
-    name: 'Marketing Digital',
-    students: 75,
-    growth: 18,
-    completion: 80,
-    category: 'Negocios'
-  },
-  { 
-    name: 'Inteligencia Artificial',
-    students: 65,
-    growth: 30,
-    completion: 75,
-    category: 'Tecnología'
-  },
-]
-
-const dropoutData = [
-  { name: 'Matemáticas Avanzadas', rate: 15 },
-  { name: 'Física Cuántica', rate: 12 },
-  { name: 'Química Orgánica', rate: 10 },
-  { name: 'Historia Antigua', rate: 8 },
-  { name: 'Literatura Clásica', rate: 7 },
-  { name: 'Biología Molecular', rate: 6.5 },
-  { name: 'Cálculo Diferencial', rate: 6 },
-  { name: 'Programación Avanzada', rate: 5.8 },
-  { name: 'Economía Internacional', rate: 5.5 },
-  { name: 'Psicología Social', rate: 5.2 },
-  { name: 'Derecho Constitucional', rate: 5 },
-  { name: 'Ingeniería de Software', rate: 4.8 },
-  { name: 'Marketing Digital', rate: 4.5 },
-  { name: 'Contabilidad Financiera', rate: 4.2 },
-  { name: 'Arquitectura Moderna', rate: 4 },
-  { name: 'Medicina Preventiva', rate: 3.8 },
-  { name: 'Educación Especial', rate: 3.5 },
-  { name: 'Administración Pública', rate: 3.2 },
-  { name: 'Filosofía Contemporánea', rate: 3 },
-  { name: 'Lingüística Aplicada', rate: 2.8 },
-]
+// Colores para los gráficos
+const COLORS = ['#4A6741', '#8FBC8F', '#90EE90', '#98FB98', '#F0FFF0']
 
 export default function DashboardPage() {
+  const router = useRouter()
+  const {
+    statistics,
+    statisticsLoading,
+    statisticsError,
+    getStatistics,
+    courses,
+    coursesLoading,
+    coursesError,
+    getCourses,
+    coursesWithSort,
+    coursesWithSortLoading,
+    coursesWithSortError,
+    getCoursesWithSort,
+    isLoading,
+    isSuccess,
+    hasError
+  } = useMoodleStatisticsController()
+
+  const [selectedSort, setSelectedSort] = useState({ sort_by: 'total_enrolled', sort_order: 'desc' })
+
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    getStatistics()
+    getCourses(1, 10)
+    getCoursesWithSort('total_enrolled', 'desc', 1, 15)
+  }, [getStatistics, getCourses, getCoursesWithSort])
+
+  // Preparar datos para gráficos
+  const prepareTopCoursesData = () => {
+    if (!coursesWithSort?.data) return []
+    
+    return coursesWithSort.data.slice(0, 10).map(course => ({
+      name: course.course_name,
+      students: course.total_enrolled,
+      completion: course.completion_rate_percent,
+      grade: course.avg_final_grade,
+      activities: course.total_activities,
+      category: course.category_name
+    }))
+  }
+
+  const prepareCompletionRateData = () => {
+    if (!coursesWithSort?.data) return []
+    
+    return coursesWithSort.data
+      .filter(course => course.total_enrolled > 0)
+      .slice(0, 15)
+      .map(course => ({
+        name: course.course_name,
+        rate: course.completion_rate_percent
+      }))
+      .sort((a, b) => b.rate - a.rate)
+  }
+
+  const prepareGradeDistributionData = () => {
+    if (!coursesWithSort?.data) return []
+    
+    const gradeRanges = [
+      { range: '90-100', count: 0, color: '#4A6741' },
+      { range: '80-89', count: 0, color: '#8FBC8F' },
+      { range: '70-79', count: 0, color: '#90EE90' },
+      { range: '60-69', count: 0, color: '#98FB98' },
+      { range: '0-59', count: 0, color: '#F0FFF0' }
+    ]
+
+    coursesWithSort.data.forEach(course => {
+      const grade = course.avg_final_grade
+      if (grade >= 90) gradeRanges[0].count++
+      else if (grade >= 80) gradeRanges[1].count++
+      else if (grade >= 70) gradeRanges[2].count++
+      else if (grade >= 60) gradeRanges[3].count++
+      else gradeRanges[4].count++
+    })
+
+    return gradeRanges.filter(range => range.count > 0)
+  }
+
+  const prepareCategoryDistributionData = () => {
+    if (!coursesWithSort?.data) return []
+    
+    const categoryCount = coursesWithSort.data.reduce((acc, course) => {
+      acc[course.category_name] = (acc[course.category_name] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    return Object.entries(categoryCount).map(([category, count], index) => ({
+      name: category,
+      value: count,
+      color: COLORS[index % COLORS.length]
+    }))
+  }
+
+  const prepareActivityTrendData = () => {
+    if (!coursesWithSort?.data) return []
+    
+    return coursesWithSort.data
+      .sort((a, b) => b.total_activities - a.total_activities)
+      .slice(0, 8)
+      .map(course => ({
+        name: course.course_name,
+        activities: course.total_activities,
+        enrolled: course.total_enrolled
+      }))
+  }
+
+  // Calcular estadísticas adicionales
+  const calculateAdditionalStats = () => {
+    if (!coursesWithSort?.data || !statistics?.data) return null
+
+    const courses = coursesWithSort.data
+    const stats = statistics.data
+
+    const totalStudents = courses.reduce((sum, course) => sum + course.total_enrolled, 0)
+    const totalCompletions = courses.reduce((sum, course) => sum + course.completed_count, 0)
+    const avgGrade = courses.reduce((sum, course) => sum + course.avg_final_grade, 0) / courses.length
+    const activeCourses = courses.filter(course => course.is_visible === 1).length
+    const inactiveCourses = courses.filter(course => course.is_visible === 0).length
+
+    return {
+      totalStudents,
+      totalCompletions,
+      avgGrade: avgGrade.toFixed(1),
+      activeCourses,
+      inactiveCourses,
+      totalActivities: stats.total_activities,
+      lowUserCourses: stats.courses_with_low_users,
+      inactive30Days: stats.courses_inactive_30_days
+    }
+  }
+
+  const additionalStats = calculateAdditionalStats()
+
+  if (isLoading.any) {
+    return (
+      <div className="min-h-screen bg-white flex">
+        <Sidebar />
+        <div className="flex-1 ml-72 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-olive-dark"></div>
+            <p className="mt-4 text-olive-dark">Cargando estadísticas...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (hasError.statistics || hasError.courses || hasError.coursesWithSort) {
+    return (
+      <div className="min-h-screen bg-white flex">
+        <Sidebar />
+        <div className="flex-1 ml-72 flex items-center justify-center">
+          <div className="text-center">
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-red-600 mb-2">Error al cargar datos</h2>
+            <p className="text-gray-600">No se pudieron cargar las estadísticas. Inténtalo de nuevo más tarde.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-white flex">
       <Sidebar />
@@ -88,7 +200,7 @@ export default function DashboardPage() {
         {/* Top Bar */}
         <div className="h-16 border-b border-olive-dark/10 flex items-center justify-between px-6 bg-white">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-olive-dark">Dashboard</h1>
+            <h1 className="text-xl font-semibold text-olive-dark">Dashboard de Estadísticas</h1>
           </div>
           <div className="flex items-center space-x-4">
             <button className="p-2 rounded-lg hover:bg-pistachio/10 text-olive-dark">
@@ -103,176 +215,187 @@ export default function DashboardPage() {
         {/* Dashboard Content */}
         <div className="p-6">
           <div className="space-y-8">
+            {/* Header Card */}
             <Card className="border-2 border-olive-dark/20 shadow-lg">
               <CardHeader className="text-center bg-gradient-to-r from-olive-dark to-olive-dark/90 text-white rounded-t-lg">
                 <div className="flex items-center justify-center gap-4 mb-4">
                   <img src="/tasqui-logo.png" alt="Tasqui Logo" className="h-12 w-auto" />
                 </div>
-                <CardTitle className="text-2xl font-bold">Dashboard de Estadísticas</CardTitle>
+                <CardTitle className="text-2xl font-bold">Dashboard de Estadísticas de Moodle</CardTitle>
+                <p className="text-pistachio/90">Datos en tiempo real de la plataforma educativa</p>
               </CardHeader>
             </Card>
             
-            {/* Stats Grid */}
+            {/* Stats Grid - Estadísticas Principales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-2 border-olive-dark/20 shadow-md">
                 <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Total Estudiantes</CardTitle>
+                  <CardTitle className="text-lg text-olive-dark">Total Cursos</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 bg-white">
                   <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold text-olive-dark">1,234</div>
-                    <Users className="h-8 w-8 text-olive-dark/60" />
-                  </div>
-                  <p className="text-sm text-olive-dark/70 mt-2">+12% desde el mes pasado</p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-olive-dark/20 shadow-md">
-                <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Cursos Activos</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6 bg-white">
-                  <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold text-olive-dark">45</div>
+                    <div className="text-2xl font-bold text-olive-dark">{statistics?.data?.total_courses || 0}</div>
                     <BookOpen className="h-8 w-8 text-olive-dark/60" />
                   </div>
-                  <p className="text-sm text-olive-dark/70 mt-2">+3 nuevos este mes</p>
+                  <div className="flex justify-between text-sm text-olive-dark/70 mt-2">
+                    <span>Activos: {statistics?.data?.active_courses || 0}</span>
+                    <span>Inactivos: {statistics?.data?.inactive_courses || 0}</span>
+                  </div>
                 </CardContent>
               </Card>
 
               <Card className="border-2 border-olive-dark/20 shadow-md">
                 <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">PQRS Pendientes</CardTitle>
+                  <CardTitle className="text-lg text-olive-dark">Total Inscripciones</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 bg-white">
                   <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold text-olive-dark">23</div>
-                    <FileText className="h-8 w-8 text-olive-dark/60" />
+                    <div className="text-2xl font-bold text-olive-dark">{statistics?.data?.total_enrollments?.toLocaleString() || 0}</div>
+                    <Users className="h-8 w-8 text-olive-dark/60" />
                   </div>
-                  <p className="text-sm text-olive-dark/70 mt-2">-5 desde ayer</p>
+                  <p className="text-sm text-olive-dark/70 mt-2">
+                    Completaciones: {statistics?.data?.total_completions?.toLocaleString() || 0}
+                  </p>
                 </CardContent>
               </Card>
 
               <Card className="border-2 border-olive-dark/20 shadow-md">
                 <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Certificados Emitidos</CardTitle>
+                  <CardTitle className="text-lg text-olive-dark">Tasa de Completación</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 bg-white">
                   <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold text-olive-dark">567</div>
-                    <Award className="h-8 w-8 text-olive-dark/60" />
+                    <div className="text-2xl font-bold text-olive-dark">{statistics?.data?.average_completion_rate?.toFixed(1) || 0}%</div>
+                    <Target className="h-8 w-8 text-olive-dark/60" />
                   </div>
-                  <p className="text-sm text-olive-dark/70 mt-2">+45 este mes</p>
+                  <p className="text-sm text-olive-dark/70 mt-2">
+                    Promedio de calificación: {statistics?.data?.average_final_grade?.toFixed(1) || 0}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-2 border-olive-dark/20 shadow-md">
+                <CardHeader className="bg-pistachio/20 rounded-t-lg">
+                  <CardTitle className="text-lg text-olive-dark">Total Actividades</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 bg-white">
+                  <div className="flex items-center justify-between">
+                    <div className="text-2xl font-bold text-olive-dark">{statistics?.data?.total_activities?.toLocaleString() || 0}</div>
+                    <Activity className="h-8 w-8 text-olive-dark/60" />
+                  </div>
+                  <p className="text-sm text-olive-dark/70 mt-2">
+                    Cursos con pocos usuarios: {statistics?.data?.courses_with_low_users || 0}
+                  </p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Top Cursos por Inscripciones */}
               <Card className="border-2 border-olive-dark/20 shadow-md">
                 <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Top 5 Cursos más Utilizados</CardTitle>
+                  <CardTitle className="text-lg text-olive-dark">Top 10 Cursos por Inscripciones</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 bg-white">
-                  <div className="space-y-6">
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={topCourses}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#4A6741" opacity={0.2} />
-                          <XAxis 
-                            dataKey="name" 
-                            stroke="#4A6741"
-                            tick={{ fontSize: 12 }}
-                            angle={-45}
-                            textAnchor="end"
-                            height={70}
-                          />
-                          <YAxis stroke="#4A6741" />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'white',
-                              border: '1px solid #4A6741',
-                              borderRadius: '4px'
-                            }}
-                            formatter={(value, name) => {
-                              if (name === 'students') return [`${value} estudiantes`, 'Total Estudiantes']
-                              if (name === 'growth') return [`+${value}%`, 'Crecimiento']
-                              if (name === 'completion') return [`${value}%`, 'Tasa de Completación']
-                              return [value, name]
-                            }}
-                          />
-                          <Bar 
-                            dataKey="students" 
-                            fill="#4A6741"
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                    
-                    <div className="mt-6">
-                      <div className="flex overflow-x-auto pb-4 gap-4 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-olive-dark/20 scrollbar-track-transparent">
-                        {topCourses.map((course, index) => (
-                          <div 
-                            key={course.name}
-                            className="p-4 rounded-lg border border-olive-dark/20 hover:bg-pistachio/10 transition-colors flex flex-col min-w-[280px] max-w-[280px] snap-center"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-sm font-medium text-olive-dark/70 bg-pistachio/20 px-2 py-1 rounded-full">
-                                #{index + 1}
-                              </span>
-                              <span className="text-xs px-2 py-1 rounded-full bg-pistachio/20 text-olive-dark">
-                                {course.category}
-                              </span>
-                            </div>
-                            <h3 className="font-semibold text-olive-dark mb-3 line-clamp-2 min-h-[3rem]">
-                              {course.name}
-                            </h3>
-                            <div className="space-y-2 mt-auto">
-                              <div className="flex items-center justify-between text-sm bg-white/50 p-2 rounded">
-                                <span className="text-olive-dark/70">Estudiantes</span>
-                                <span className="font-medium text-olive-dark">{course.students}</span>
-                              </div>
-                              <div className="flex items-center justify-between text-sm bg-white/50 p-2 rounded">
-                                <span className="text-olive-dark/70">Crecimiento</span>
-                                <span className="font-medium text-green-600 flex items-center">
-                                  <TrendingUp className="h-4 w-4 mr-1" />
-                                  +{course.growth}%
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-sm bg-white/50 p-2 rounded">
-                                <span className="text-olive-dark/70">Completación</span>
-                                <span className="font-medium text-olive-dark">{course.completion}%</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={prepareTopCoursesData()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4A6741" opacity={0.2} />
+                        <XAxis 
+                          dataKey="name" 
+                          stroke="#4A6741"
+                          tick={{ fontSize: 10 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis stroke="#4A6741" />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white',
+                            border: '1px solid #4A6741',
+                            borderRadius: '4px'
+                          }}
+                          formatter={(value, name) => {
+                            if (name === 'students') return [`${value} estudiantes`, 'Inscritos']
+                            if (name === 'completion') return [`${value}%`, 'Tasa de Completación']
+                            if (name === 'grade') return [`${value}`, 'Calificación Promedio']
+                            return [value, name]
+                          }}
+                        />
+                        <Bar 
+                          dataKey="students" 
+                          fill="#4A6741"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Distribución de Calificaciones */}
               <Card className="border-2 border-olive-dark/20 shadow-md">
                 <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Tasa de Deserción por Curso</CardTitle>
+                  <CardTitle className="text-lg text-olive-dark">Distribución de Calificaciones</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 bg-white">
-                  <div className="h-[600px]">
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={prepareGradeDistributionData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="count"
+                        >
+                          {prepareGradeDistributionData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white',
+                            border: '1px solid #4A6741',
+                            borderRadius: '4px'
+                          }}
+                          formatter={(value) => [`${value} cursos`, 'Cantidad']}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Segunda fila de gráficos */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Tasa de Completación por Curso */}
+              <Card className="border-2 border-olive-dark/20 shadow-md">
+                <CardHeader className="bg-pistachio/20 rounded-t-lg">
+                  <CardTitle className="text-lg text-olive-dark">Tasa de Completación por Curso</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 bg-white">
+                  <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={dropoutData}
+                        data={prepareCompletionRateData()}
                         layout="vertical"
-                        margin={{ top: 5, right: 30, left: 150, bottom: 5 }}
+                        margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="#4A6741" opacity={0.2} />
-                        <XAxis type="number" stroke="#4A6741" />
+                        <XAxis type="number" stroke="#4A6741" domain={[0, 100]} />
                         <YAxis 
                           type="category" 
                           dataKey="name" 
                           stroke="#4A6741"
-                          width={140}
-                          tick={{ fontSize: 12 }}
+                          width={110}
+                          tick={{ fontSize: 10 }}
                         />
                         <Tooltip 
                           contentStyle={{ 
@@ -280,7 +403,7 @@ export default function DashboardPage() {
                             border: '1px solid #4A6741',
                             borderRadius: '4px'
                           }}
-                          formatter={(value) => [`${value}%`, 'Tasa de Deserción']}
+                          formatter={(value) => [`${value}%`, 'Tasa de Completación']}
                         />
                         <Bar 
                           dataKey="rate" 
@@ -292,54 +415,150 @@ export default function DashboardPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-            {/* Additional Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Distribución por Categorías */}
               <Card className="border-2 border-olive-dark/20 shadow-md">
                 <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Usuarios con Mayor Tiempo Conectado</CardTitle>
+                  <CardTitle className="text-lg text-olive-dark">Distribución por Categorías</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 bg-white">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-2 hover:bg-pistachio/10 rounded">
-                      <span className="text-olive-dark">Juan Pérez</span>
-                      <span className="font-medium text-olive-dark">156 horas</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 hover:bg-pistachio/10 rounded">
-                      <span className="text-olive-dark">María García</span>
-                      <span className="font-medium text-olive-dark">142 horas</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 hover:bg-pistachio/10 rounded">
-                      <span className="text-olive-dark">Carlos López</span>
-                      <span className="font-medium text-olive-dark">128 horas</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-olive-dark/20 shadow-md">
-                <CardHeader className="bg-pistachio/20 rounded-t-lg">
-                  <CardTitle className="text-lg text-olive-dark">Uso Total de la Plataforma</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6 bg-white">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-2 hover:bg-pistachio/10 rounded">
-                      <span className="text-olive-dark">Horas Totales</span>
-                      <span className="font-medium text-olive-dark">12,456</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 hover:bg-pistachio/10 rounded">
-                      <span className="text-olive-dark">Promedio Diario</span>
-                      <span className="font-medium text-olive-dark">415 horas</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 hover:bg-pistachio/10 rounded">
-                      <span className="text-olive-dark">Pico de Usuarios</span>
-                      <span className="font-medium text-olive-dark">1,234 usuarios</span>
-                    </div>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={prepareCategoryDistributionData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {prepareCategoryDistributionData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white',
+                            border: '1px solid #4A6741',
+                            borderRadius: '4px'
+                          }}
+                          formatter={(value) => [`${value} cursos`, 'Cantidad']}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Tercera fila - Actividades y Estadísticas Detalladas */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Actividades por Curso */}
+              <Card className="border-2 border-olive-dark/20 shadow-md">
+                <CardHeader className="bg-pistachio/20 rounded-t-lg">
+                  <CardTitle className="text-lg text-olive-dark">Actividades por Curso</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 bg-white">
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={prepareActivityTrendData()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4A6741" opacity={0.2} />
+                        <XAxis 
+                          dataKey="name" 
+                          stroke="#4A6741"
+                          tick={{ fontSize: 10 }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                        />
+                        <YAxis stroke="#4A6741" />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white',
+                            border: '1px solid #4A6741',
+                            borderRadius: '4px'
+                          }}
+                          formatter={(value, name) => {
+                            if (name === 'activities') return [`${value} actividades`, 'Total Actividades']
+                            if (name === 'enrolled') return [`${value} estudiantes`, 'Inscritos']
+                            return [value, name]
+                          }}
+                        />
+                        <Bar 
+                          dataKey="activities" 
+                          fill="#4A6741"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Estadísticas Detalladas */}
+              <Card className="border-2 border-olive-dark/20 shadow-md">
+                <CardHeader className="bg-pistachio/20 rounded-t-lg">
+                  <CardTitle className="text-lg text-olive-dark">Estadísticas Detalladas</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 bg-white">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 hover:bg-pistachio/10 rounded">
+                      <div className="flex items-center gap-3">
+                        <Eye className="h-5 w-5 text-olive-dark" />
+                        <span className="text-olive-dark">Cursos Visibles</span>
+                      </div>
+                      <span className="font-medium text-olive-dark">{additionalStats?.activeCourses || 0}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 hover:bg-pistachio/10 rounded">
+                      <div className="flex items-center gap-3">
+                        <EyeOff className="h-5 w-5 text-olive-dark" />
+                        <span className="text-olive-dark">Cursos Ocultos</span>
+                      </div>
+                      <span className="font-medium text-olive-dark">{additionalStats?.inactiveCourses || 0}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 hover:bg-pistachio/10 rounded">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-5 w-5 text-orange-500" />
+                        <span className="text-olive-dark">Cursos con Pocos Usuarios</span>
+                      </div>
+                      <span className="font-medium text-orange-600">{statistics?.data?.courses_with_low_users || 0}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 hover:bg-pistachio/10 rounded">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-5 w-5 text-red-500" />
+                        <span className="text-olive-dark">Inactivos 30+ Días</span>
+                      </div>
+                      <span className="font-medium text-red-600">{statistics?.data?.courses_inactive_30_days || 0}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 hover:bg-pistachio/10 rounded">
+                      <div className="flex items-center gap-3">
+                        <Award className="h-5 w-5 text-green-600" />
+                        <span className="text-olive-dark">Calificación Promedio</span>
+                      </div>
+                      <span className="font-medium text-green-600">{additionalStats?.avgGrade || 0}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 hover:bg-pistachio/10 rounded">
+                      <div className="flex items-center gap-3">
+                        <BarChart3 className="h-5 w-5 text-blue-600" />
+                        <span className="text-olive-dark">Total Actividades</span>
+                      </div>
+                      <span className="font-medium text-blue-600">{statistics?.data?.total_activities?.toLocaleString() || 0}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tabla de Cursos Detallada */}
+        
           </div>
         </div>
       </div>
